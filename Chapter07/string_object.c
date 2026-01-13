@@ -36,6 +36,7 @@ int main (void)
     if (string_create(s, "Anindya Mozumdar")) {
         printf("The struct has value %s with length %d.\n", s->value, s->length);
         string_destroy(s);
+        printf("After destruction, length is %d.\n", s->length);
     } else {
         fprintf(stderr, "Error.\n");
     }
