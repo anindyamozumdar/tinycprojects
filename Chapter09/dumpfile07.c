@@ -1,0 +1,150 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <getopt.h>
+
+int options;
+
+#define MAJOR_VERSION 1
+#define MINOR_VERSION 0
+
+#define SIZE 16
+#define ABBR 1
+#define OCT 2
+#define set_abbr() options |= ABBR
+#define test_abbr() ((options & ABBR) == ABBR)
+#define set_oct() options |= OCT
+#define test_oct() ((options & OCT) == OCT)
+
+void line_out (int offset, int length, unsigned char *data)
+{
+    int a;
+
+    if (!test_abbr()) {
+        if (test_oct()) {
+            printf("%05o ", offset);
+        } else {
+            printf("%05X ", offset);
+        }
+    }
+
+    for (a = 0; a < length; a++) {
+        if (test_oct()) {
+            printf(" %03o", *(data + a));
+        } else {
+            printf(" %02X", *(data + a));
+        }
+        if ((a + 1) % 8 == 0 && !test_abbr()) {
+            putchar(' ');
+        }
+    }
+
+    if (length < SIZE) {
+        for (; a < SIZE; a++) {
+            if (test_oct()) {
+                printf("    ");
+            } else {
+                printf("   ");
+            }
+            if ((a + 1) % 8 == 0 && !test_abbr()) {
+                putchar(' ');
+            }
+        }
+    }
+
+    if (!test_abbr()) {
+        for (a = 0; a < length; a++) {
+            if (*(data + a) >= ' ' && *(data + a) <= '~') {
+                putchar(*(data + a));
+            } else {
+                putchar(' ');
+            }
+        }
+    }
+
+    putchar('\n');
+}
+
+void help (void)
+{
+    puts("dumpfile - output a file's raw data");
+    puts("Format: dumpfile filename [otions]");
+    puts("Options:");
+    puts("-a abbreviated output");
+    puts("-o output octal instead of hex");
+    puts("-v display program version");
+    puts("-h display this help");
+    exit(1);
+}
+
+void version (void)
+{
+    printf("Version %d.%d\n", MAJOR_VERSION, MINOR_VERSION);
+    exit(1);
+}
+
+int main (int argc, char *argv[])
+{
+    unsigned char buffer[SIZE];
+    char *filename;
+    FILE *fp;
+    int r, ch, offset, index;
+
+    if (argc < 2) {
+        puts("Format: dumpfile filename [options]");
+        exit(1);
+    }
+
+    filename = argv[1];
+
+    if (strcmp(filename, "-h") == 0) {
+        help();
+    }
+
+    if (strcmp(filename, "-v") == 0) {
+        version();
+    }
+
+    fp = fopen(filename, "r");
+    if (fp == NULL) {
+        fprintf(stderr, "Unable to open file '%s'\n", filename);
+        exit(1);
+    }
+
+    offset = 0;
+    index = 0;
+
+    opterr = 0;
+    options = 0;
+
+    while ((r = getopt(argc, argv, "aohv")) != -1) {
+        switch (r) {
+            case 'a': set_abbr(); break;
+            case 'o': set_oct(); break;
+            case 'h': help(); break;
+            case 'v': version(); break;
+            case '?': printf("Switch '%c' is invalid\n", optopt); break;
+            default: puts("Unknown option");
+        }
+    }
+
+    while (!feof(fp)) {
+        ch = fgetc(fp);
+        if (ch == EOF) {
+            if (index != 0) {
+                line_out(offset, index, buffer);
+            }
+        }
+        buffer[index] = ch;
+        index++;
+        if (index == SIZE) {
+            line_out(offset, SIZE, buffer);
+            offset += SIZE;
+            index = 0;
+        }
+    }
+
+    fclose(fp);
+    return 0;
+}
